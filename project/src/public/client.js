@@ -2,6 +2,7 @@ let store = {
     user: { name: "Student" },
     apod: '',
     rovers: ['Curiosity', 'Opportunity', 'Spirit'],
+    roverInfo: {},
 }
 
 // add our markup to the page
@@ -19,7 +20,7 @@ const render = async (root, state) => {
 
 // create content
 const App = (state) => {
-    let { rovers, apod } = state
+    let { apod, roverInfo } = state;
 
     return `
         <header></header>
@@ -37,6 +38,7 @@ const App = (state) => {
                     but generally help with discoverability of relevant imagery.
                 </p>
                 ${ImageOfTheDay(apod)}
+                ${displayRoverInfo(roverInfo)}
             </section>
         </main>
         <footer></footer>
@@ -63,17 +65,13 @@ const Greeting = (name) => {
     `
 }
 
-// Example of a pure function that renders infomation requested from the backend
+// Example of a pure function that renders information requested from the backend
 const ImageOfTheDay = (apod) => {
 
     // If image does not already exist, or it is not from today -- request it again
     const today = new Date()
-    const photodate = new Date(apod.date)
-    console.log(photodate.getDate(), today.getDate());
-
-    console.log(photodate.getDate() === today.getDate());
     if (!apod || apod.date === today.getDate() ) {
-        getImageOfTheDay(store)
+        getImageOfTheDay()
     }
 
     // check if the photo of the day is actually type video!
@@ -88,18 +86,57 @@ const ImageOfTheDay = (apod) => {
             <img src="${apod.image.url}" height="350px" width="100%" />
             <p>${apod.image.explanation}</p>
         `)
+    } else {
+        return `<p>Loading...</p>`;
+    }
+}
+
+const displayRoverInfo = (roverInfo) => {
+    // Check if we already have the most updated info
+    // If not, get it and update the store
+
+    const { lastQueryDay, curiosity, opportunity, spirit } = roverInfo;
+    const readyToRender = lastQueryDay &&
+        curiosity.photos.length > 0 && opportunity.photos.length > 0 && spirit.photos.length > 0;
+    const today = new Date().toISOString().split('T')[0];
+    if (!lastQueryDay || today > lastQueryDay) {
+        getUpdatedRoverInfo();
+    }
+    if (readyToRender) {
+        return (`
+            <img src="${roverInfo.curiosity.photos[0].img_src}" height="350px" />
+            <img src="${roverInfo.opportunity.photos[0].img_src}" height="350px" />
+            <img src="${roverInfo.spirit.photos[0].img_src}" height="350px" />
+        `)
+    } else {
+        return `<p>Loading...</p>`;
     }
 }
 
 // ------------------------------------------------------  API CALLS
 
 // Example API call
-const getImageOfTheDay = (state) => {
-    let { apod } = state
+const getImageOfTheDay = () => {
 
     fetch(`http://localhost:3000/apod`)
         .then(res => res.json())
         .then(apod => updateStore(store, { apod }))
+        .catch(err => console.log('Error when fetching image of the day ', err))
 
     // return data
 }
+
+const getUpdatedRoverInfo = () => {
+    // Get updated rover info
+    // Update the roverInfo store object
+
+    fetch(`http://localhost:3000/rover-info?rovers=${store.rovers}`)
+        .then(res => res.json())
+        .then((roverInfo) => {
+            updateStore(store, { roverInfo });
+            console.log('roverInfo ', roverInfo)
+            return roverInfo;
+        })
+        .catch(err => console.log('Error when fetching rover info ', err))
+}
+
