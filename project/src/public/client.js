@@ -34,8 +34,7 @@ const App = (state) => {
         ${TabsRow(rovers, selectedRover)}
         <main>
             <section>
-                ${ImageOfTheDay(apod)}
-                ${displayRoverInfo(roverInfo)}
+                ${Rovers(rovers, roverInfo, selectedRover)}
             </section>
         </main>
         <footer>
@@ -51,10 +50,42 @@ window.addEventListener('load', () => {
     render(root, store)
 });
 
+const randomlySelectPhotos = (photos) => {
+    // Randomly select three photos to display
+    // If there are less than three photos, select all
+    // Return an array of photos
+
+    let displayText = '';
+    switch (photos.length) {
+        case 0:
+            displayText = 'Sorry, not photos to display';
+            break;
+        case 1:
+            displayText = 'View the most recently taken photo: ';
+            break;
+        default:
+            displayText = 'View some of the most recently taken photos: ';
+    }
+    let photosToDisplay;
+    if (photos.length <= 3) {
+        photosToDisplay = Object.assign([], photos)
+    } else {
+        const randIndexes = [];
+        while(randIndexes.length < 3){
+            const i = Math.floor(Math.random() * 100) + 1;
+            if(randIndexes.indexOf(i) === -1) randIndexes.push(i);
+        }
+        photosToDisplay = randIndexes.map(i => photos[i]);
+    }
+    return {
+        displayText,
+        photosToDisplay,
+    };
+};
+
 // ------------------------------------------------------  COMPONENTS
 
 const Tab = (roverName, selectedRover) => {
-    console.log('Selected rover: ', selectedRover);
     const className = roverName === selectedRover ? 'active' : 'inactive';
     return `
         <button class="tablinks ${className}">
@@ -71,48 +102,34 @@ const TabsRow = (roverNames, selectedRover) => {
     )
 }
 
-// Example of a pure function that renders information requested from the backend
-const ImageOfTheDay = (apod) => {
-
-    // If image does not already exist, or it is not from today -- request it again
-    const today = new Date()
-    if (!apod || apod.date === today.getDate() ) {
-        getImageOfTheDay()
-    }
-
-    // check if the photo of the day is actually type video!
-    if (apod && apod.media_type === "video") {
-        return (`
-            <p>See today's featured video <a href="${apod.url}">here</a></p>
-            <p>${apod.title}</p>
-            <p>${apod.explanation}</p>
-        `)
-    } else if (apod) {
-        return (`
-            <img src="${apod.image.url}" height="350px" width="100%" />
-            <p>${apod.image.explanation}</p>
-        `)
-    } else {
-        return `<p>Loading...</p>`;
-    }
+const RoverPhotos = (photos) => {
+    const { displayText, photosToDisplay } = randomlySelectPhotos(photos);
+    return (`
+        <p>${displayText}</p>
+        ${photosToDisplay.map((photo) => `<img src="${photo.img_src}" height="350px" />`)}
+    `)
 }
 
-const displayRoverInfo = (roverInfo) => {
+const Rovers = (rovers, roverInfo, selectedRover) => {
     // Check if we already have the most updated info
     // If not, get it (and update the store)
-    const { lastQueryDay, curiosity, opportunity, spirit } = roverInfo;
-    const readyToRender = lastQueryDay &&
-        curiosity.photos.length > 0 && opportunity.photos.length > 0 && spirit.photos.length > 0;
+    const { lastQueryDay } = roverInfo;
     const today = new Date().toISOString().split('T')[0];
     if (!lastQueryDay || today > lastQueryDay) {
         getUpdatedRoverInfo();
     }
-    if (readyToRender) {
+    if (lastQueryDay) {
+        const { manifest, photos } = roverInfo[selectedRover.toLowerCase()];
         return (`
-            <img src="${roverInfo.curiosity.photos[0].img_src}" height="350px" />
-            <img src="${roverInfo.opportunity.photos[0].img_src}" height="350px" />
-            <img src="${roverInfo.spirit.photos[0].img_src}" height="350px" />
-        `)
+        <divclass="tabcontent">
+            <h3>${selectedRover}</h3>
+            <p>Launch Date: ${manifest.launch_date}</p>
+            <p>Landing Date: ${manifest.launch_date}</p>
+            <p>Status: ${manifest.launch_date}</p>
+            <p>Date the most recent photos were taken: ${manifest.launch_date}</p>
+            ${RoverPhotos(photos)}
+        </div>
+    `)
     } else {
         return `<p>Loading...</p>`;
     }
@@ -139,7 +156,6 @@ const getUpdatedRoverInfo = () => {
         .then(res => res.json())
         .then((roverInfo) => {
             updateStore(store, { roverInfo });
-            console.log('roverInfo ', roverInfo)
             return roverInfo;
         })
         .catch(err => console.log('Error when fetching rover info ', err))
