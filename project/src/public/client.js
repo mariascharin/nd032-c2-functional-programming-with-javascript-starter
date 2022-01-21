@@ -1,11 +1,17 @@
 let store = {
-    user: { name: "Student" },
     apod: '',
     rovers: ['Curiosity', 'Opportunity', 'Spirit'],
+    roverInfo: {},
+    selectedRover: 'Curiosity',
 }
 
 // add our markup to the page
 const root = document.getElementById('root')
+
+function tabSelect (selectedTab) {
+    updateStore(store, { selectedRover: selectedTab })
+}
+window.onSelectTab = tabSelect;
 
 const updateStore = (store, newState) => {
     store = Object.assign(store, newState)
@@ -16,90 +22,142 @@ const render = async (root, state) => {
     root.innerHTML = App(state)
 }
 
-
 // create content
 const App = (state) => {
-    let { rovers, apod } = state
+    let { rovers, apod, roverInfo, selectedRover } = state;
 
     return `
-        <header></header>
+        <header>
+            <h1>Welcome to Mars Rovers!</h1>
+            <p>Click on the tabs to view interesting information about the Mars rovers!</p>
+        </header>
+        ${TabsRow(rovers, selectedRover)}
         <main>
-            ${Greeting(store.user.name)}
             <section>
-                <h3>Put things on the page!</h3>
-                <p>Here is an example section.</p>
-                <p>
-                    One of the most popular websites at NASA is the Astronomy Picture of the Day. In fact, this website is one of
-                    the most popular websites across all federal agencies. It has the popular appeal of a Justin Bieber video.
-                    This endpoint structures the APOD imagery and associated metadata so that it can be repurposed for other
-                    applications. In addition, if the concept_tags parameter is set to True, then keywords derived from the image
-                    explanation are returned. These keywords could be used as auto-generated hashtags for twitter or instagram feeds;
-                    but generally help with discoverability of relevant imagery.
-                </p>
-                ${ImageOfTheDay(apod)}
+                ${Rovers(rovers, roverInfo, selectedRover)}
             </section>
         </main>
-        <footer></footer>
+        <footer>
+            <h6>
+                Images and information are collected from the <a href="https://api.nasa.gov/">NASA API</a>.
+            </h6>
+        </footer>
     `
-}
+};
 
 // listening for load event because page should load before any JS is called
 window.addEventListener('load', () => {
     render(root, store)
-})
+});
+
+const randomlySelectPhotos = (photos) => {
+    // Randomly select three photos to display
+    // If there are less than three photos, select all
+    // Return an array of photos
+
+    let displayText = '';
+    switch (photos.length) {
+        case 0:
+            displayText = 'Sorry, not photos to display';
+            break;
+        case 1:
+            displayText = 'View the most recently taken photo: ';
+            break;
+        default:
+            displayText = 'View some of the most recently taken photos: ';
+    }
+    let photosToDisplay;
+    if (photos.length <= 3) {
+        photosToDisplay = Object.assign([], photos)
+    } else {
+        const randIndexes = [];
+        while(randIndexes.length < 3){
+            const i = Math.floor(Math.random() * 100) + 1;
+            if(randIndexes.indexOf(i) === -1) randIndexes.push(i);
+        }
+        photosToDisplay = randIndexes.map(i => photos[i]);
+    }
+    return {
+        displayText,
+        photosToDisplay,
+    };
+};
 
 // ------------------------------------------------------  COMPONENTS
 
-// Pure function that renders conditional information -- THIS IS JUST AN EXAMPLE, you can delete it.
-const Greeting = (name) => {
-    if (name) {
-        return `
-            <h1>Welcome, ${name}!</h1>
-        `
-    }
-
+const Tab = (roverName, selectedRover) => {
+    const className = roverName === selectedRover ? 'active' : 'inactive';
     return `
-        <h1>Hello!</h1>
+        <button class="tablinks ${className}">
+            <div id="${roverName}" onclick="onSelectTab(id)">${roverName}</div> 
+        </button>
     `
 }
 
-// Example of a pure function that renders infomation requested from the backend
-const ImageOfTheDay = (apod) => {
-
-    // If image does not already exist, or it is not from today -- request it again
-    const today = new Date()
-    const photodate = new Date(apod.date)
-    console.log(photodate.getDate(), today.getDate());
-
-    console.log(photodate.getDate() === today.getDate());
-    if (!apod || apod.date === today.getDate() ) {
-        getImageOfTheDay(store)
-    }
-
-    // check if the photo of the day is actually type video!
-    if (apod.media_type === "video") {
-        return (`
-            <p>See today's featured video <a href="${apod.url}">here</a></p>
-            <p>${apod.title}</p>
-            <p>${apod.explanation}</p>
-        `)
-    } else {
-        return (`
-            <img src="${apod.image.url}" height="350px" width="100%" />
-            <p>${apod.image.explanation}</p>
-        `)
-    }
+const TabsRow = (roverNames, selectedRover) => {
+    return (
+        `<div class="tab">
+            ${roverNames.map((roverName) => Tab(roverName, selectedRover)).join(' ')}
+        </div>`
+    )
 }
+
+const RoverPhotos = (photos) => {
+    const { displayText, photosToDisplay } = randomlySelectPhotos(photos);
+    return (`
+        <p>${displayText}</p>
+        ${photosToDisplay.map((photo) => `<img src="${photo.img_src}" height="350px" />`)}
+    `)
+}
+
+const Rovers = (rovers, roverInfo, selectedRover) => {
+    // Check if we already have the most updated info
+    // If not, get it (and update the store)
+    const { lastQueryDay } = roverInfo;
+    const today = new Date().toISOString().split('T')[0];
+    if (!lastQueryDay || today > lastQueryDay) {
+        getUpdatedRoverInfo();
+    }
+    if (lastQueryDay) {
+        const { manifest, photos } = roverInfo[selectedRover.toLowerCase()];
+        return (`
+        <divclass="tabcontent">
+            <h3>${selectedRover}</h3>
+            <p>Launch Date: ${manifest.launch_date}</p>
+            <p>Landing Date: ${manifest.launch_date}</p>
+            <p>Status: ${manifest.launch_date}</p>
+            <p>Date the most recent photos were taken: ${manifest.launch_date}</p>
+            ${RoverPhotos(photos)}
+        </div>
+    `)
+    } else {
+        return `<p>Loading...</p>`;
+    }
+};
 
 // ------------------------------------------------------  API CALLS
 
 // Example API call
-const getImageOfTheDay = (state) => {
-    let { apod } = state
+const getImageOfTheDay = () => {
 
     fetch(`http://localhost:3000/apod`)
         .then(res => res.json())
         .then(apod => updateStore(store, { apod }))
+        .catch(err => console.log('Error when fetching image of the day ', err))
 
-    return data
+    // return data
 }
+
+const getUpdatedRoverInfo = () => {
+    // Get updated rover info
+    // Update the roverInfo store object
+
+    fetch(`http://localhost:3000/rover-info?rovers=${store.rovers}`)
+        .then(res => res.json())
+        .then((roverInfo) => {
+            updateStore(store, { roverInfo });
+            return roverInfo;
+        })
+        .catch(err => console.log('Error when fetching rover info ', err))
+}
+
