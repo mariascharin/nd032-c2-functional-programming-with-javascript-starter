@@ -1,12 +1,17 @@
 let store = {
-    user: { name: "Student" },
     apod: '',
     rovers: ['Curiosity', 'Opportunity', 'Spirit'],
     roverInfo: {},
+    selectedRover: 'Curiosity',
 }
 
 // add our markup to the page
 const root = document.getElementById('root')
+
+function tabSelect (selectedTab) {
+    updateStore(store, { selectedRover: selectedTab })
+}
+window.onSelectTab = tabSelect;
 
 const updateStore = (store, newState) => {
     store = Object.assign(store, newState)
@@ -17,52 +22,53 @@ const render = async (root, state) => {
     root.innerHTML = App(state)
 }
 
-
 // create content
 const App = (state) => {
-    let { apod, roverInfo } = state;
+    let { rovers, apod, roverInfo, selectedRover } = state;
 
     return `
-        <header></header>
+        <header>
+            <h1>Welcome to Mars Rovers!</h1>
+            <p>Click on the tabs to view interesting information about the Mars rovers!</p>
+        </header>
+        ${TabsRow(rovers, selectedRover)}
         <main>
-            ${Greeting(store.user.name)}
             <section>
-                <h3>Put things on the page!</h3>
-                <p>Here is an example section.</p>
-                <p>
-                    One of the most popular websites at NASA is the Astronomy Picture of the Day. In fact, this website is one of
-                    the most popular websites across all federal agencies. It has the popular appeal of a Justin Bieber video.
-                    This endpoint structures the APOD imagery and associated metadata so that it can be repurposed for other
-                    applications. In addition, if the concept_tags parameter is set to True, then keywords derived from the image
-                    explanation are returned. These keywords could be used as auto-generated hashtags for twitter or instagram feeds;
-                    but generally help with discoverability of relevant imagery.
-                </p>
                 ${ImageOfTheDay(apod)}
                 ${displayRoverInfo(roverInfo)}
             </section>
         </main>
-        <footer></footer>
+        <footer>
+            <h6>
+                Images and information are collected from the <a href="https://api.nasa.gov/">NASA API</a>.
+            </h6>
+        </footer>
     `
-}
+};
 
 // listening for load event because page should load before any JS is called
 window.addEventListener('load', () => {
     render(root, store)
-})
+});
 
 // ------------------------------------------------------  COMPONENTS
 
-// Pure function that renders conditional information -- THIS IS JUST AN EXAMPLE, you can delete it.
-const Greeting = (name) => {
-    if (name) {
-        return `
-            <h1>Welcome, ${name}!</h1>
-        `
-    }
-
+const Tab = (roverName, selectedRover) => {
+    console.log('Selected rover: ', selectedRover);
+    const className = roverName === selectedRover ? 'active' : 'inactive';
     return `
-        <h1>Hello!</h1>
+        <button class="tablinks ${className}">
+            <div id="${roverName}" onclick="onSelectTab(id)">${roverName}</div> 
+        </button>
     `
+}
+
+const TabsRow = (roverNames, selectedRover) => {
+    return (
+        `<div class="tab">
+            ${roverNames.map((roverName) => Tab(roverName, selectedRover)).join(' ')}
+        </div>`
+    )
 }
 
 // Example of a pure function that renders information requested from the backend
@@ -93,8 +99,7 @@ const ImageOfTheDay = (apod) => {
 
 const displayRoverInfo = (roverInfo) => {
     // Check if we already have the most updated info
-    // If not, get it and update the store
-
+    // If not, get it (and update the store)
     const { lastQueryDay, curiosity, opportunity, spirit } = roverInfo;
     const readyToRender = lastQueryDay &&
         curiosity.photos.length > 0 && opportunity.photos.length > 0 && spirit.photos.length > 0;
@@ -111,7 +116,7 @@ const displayRoverInfo = (roverInfo) => {
     } else {
         return `<p>Loading...</p>`;
     }
-}
+};
 
 // ------------------------------------------------------  API CALLS
 
